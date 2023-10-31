@@ -6,6 +6,25 @@
 
 using namespace std;
 
+
+/* This function can add 2 i32 values and return the result. */
+WasmEdge_Result Add(void *, const WasmEdge_CallingFrameContext *,
+                    const WasmEdge_Value *In, WasmEdge_Value *Out) {
+  /*
+  * Params: {i32, i32}
+  * Returns: {i32}
+  */
+
+  /* Retrieve the value 1. */
+  int32_t Val1 = WasmEdge_ValueGetI32(In[0]);
+  /* Retrieve the value 2. */
+  int32_t Val2 = WasmEdge_ValueGetI32(In[1]);
+  /* Output value 1 is Val1 + Val2. */
+  Out[0] = WasmEdge_ValueGenI32(Val1 + Val2);
+  /* Return the status of success. */
+  return WasmEdge_Result_Success;
+}
+
 int run(char *wasmFile, char *wasmFunction, int argc, char **argv, int preopenLen, const char *const *preopens) {
   /* Create the configure context and add the WASI support. */
   /* This step is not necessary unless you need WASI support. */
@@ -15,6 +34,8 @@ int run(char *wasmFile, char *wasmFunction, int argc, char **argv, int preopenLe
   /* The configure and store context to the VM creation can be NULL. */
   WasmEdge_StoreContext *StoreCxt = WasmEdge_StoreCreate();
   WasmEdge_VMContext *VMCxt = WasmEdge_VMCreate(ConfCxt, StoreCxt);
+
+  WasmEdge_ExecutorContext *ExecCxt = WasmEdge_ExecutorCreate(NULL, NULL);
 
   // add args/envs/preopens
   WasmEdge_ModuleInstanceContext *WasiCxt = WasmEdge_VMGetImportModuleContext(VMCxt, WasmEdge_HostRegistration_Wasi);
@@ -39,6 +60,54 @@ int run(char *wasmFile, char *wasmFunction, int argc, char **argv, int preopenLe
   WasmEdge_StringDelete(ModuleName);
   //
   //
+
+
+  // Add internal host function
+  //
+
+  // 1. Create a function type and function context
+  enum WasmEdge_ValType ParamList[2] = {WasmEdge_ValType_I32,
+                                        WasmEdge_ValType_I32};
+  enum WasmEdge_ValType ReturnList[1] = {WasmEdge_ValType_I32};
+  /* Create a function type: {i32, i32} -> {i32}. */
+  WasmEdge_FunctionTypeContext *HostFType =
+      WasmEdge_FunctionTypeCreate(ParamList, 2, ReturnList, 1);
+  /*
+    * Create a function context with the function type and host function body.
+    * The `Cost` parameter can be 0 if developers do not need the cost
+    * measuring.
+    */
+  WasmEdge_FunctionInstanceContext *HostFunc = WasmEdge_FunctionInstanceCreate(HostFType, Add, NULL, 0);
+  /*
+    * The third parameter is the pointer to the additional data.
+    * Developers should guarantee the life cycle of the data, and it can be NULL if the external data is not needed.
+    */
+
+  // 2. Module Instance Creation
+  WasmEdge_String HostModuleName = WasmEdge_StringCreateByCString("native_zera");
+  WasmEdge_ModuleInstanceContext *HostModCxt = WasmEdge_ModuleInstanceCreate(HostModuleName);
+
+  /* 3. Add the host function created above with the export name "add". */
+  WasmEdge_String HostFuncName = WasmEdge_StringCreateByCString("add");
+  WasmEdge_ModuleInstanceAddFunction(HostModCxt, HostFuncName, HostFunc);
+
+  // 4. Register Host Modules to WasmEdge
+  /* Register the module instance into the store. */
+  Res = WasmEdge_ExecutorRegisterImport(ExecCxt, StoreCxt, HostModCxt);
+  if (!WasmEdge_ResultOK(Res)) {
+    printf("Host module registration failed: %s\n",
+          WasmEdge_ResultGetMessage(Res));
+    return -1;
+  }
+
+  // 5. cleanup
+  WasmEdge_StringDelete(HostFuncName);
+  WasmEdge_StringDelete(HostModuleName);
+  WasmEdge_FunctionTypeDelete(HostFType);
+  
+  //
+  //
+
 
   // /* The parameters and returns arrays. */
   WasmEdge_Value Params[0];
@@ -93,6 +162,10 @@ int run(char *wasmFile, char *wasmFunction, int argc, char **argv, int preopenLe
 
   
   /* Resources deallocations. */
+
+  WasmEdge_ModuleInstanceDelete(HostModCxt);
+  WasmEdge_StoreDelete(StoreCxt);
+  WasmEdge_ExecutorDelete(ExecCxt);
   WasmEdge_VMDelete(VMCxt);
   WasmEdge_ConfigureDelete(ConfCxt);
   WasmEdge_StringDelete(FuncName);
