@@ -19,7 +19,7 @@ pub fn hello() {
 
       // host_module::log_array(input);
 
-      println!("add {:#?}", native_zera::add(2, 2));
+      println!("add {:#?}", native_functions::add(2, 6));
   }
 }
 
@@ -36,8 +36,8 @@ pub mod host_module {
   }
 }
 
-pub mod native_zera {
-  #[link(wasm_import_module = "native_zera")]
+pub mod native_functions {
+  #[link(wasm_import_module = "native_functions")]
   extern "C" {
       pub fn add(val1: i32, val2: i32) -> i32;
   }
