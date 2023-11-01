@@ -19,6 +19,7 @@ WasmEdge_Result Add(void *, const WasmEdge_CallingFrameContext *,
   int32_t Val2 = WasmEdge_ValueGetI32(In[1]);
   /* Output value 1 is Val1 + Val2. */
   Out[0] = WasmEdge_ValueGenI32(Val1 + Val2);
+  Out[1] = WasmEdge_ValueGenI32(99);
   /* Return the status of success. */
   return WasmEdge_Result_Success;
 }
@@ -105,7 +106,7 @@ WasmEdge_ModuleInstanceContext *CreateExternModule() {
   // 2. Create a function type and function context - "add"
   enum WasmEdge_ValType ParamList[2] = {WasmEdge_ValType_I32, WasmEdge_ValType_I32};
   enum WasmEdge_ValType ReturnList[1] = {WasmEdge_ValType_I32};
-  /* Create a function type: {i32, i32} -> {i32}. */
+  /* Create a function type: {i32, i32} -> {i32, i32}. */
   WasmEdge_FunctionTypeContext *HostFTypeAdd = WasmEdge_FunctionTypeCreate(ParamList, 2, ReturnList, 1);
   WasmEdge_FunctionInstanceContext *HostFuncCtxAdd = WasmEdge_FunctionInstanceCreate(HostFTypeAdd, Add, NULL, 0);
   //
@@ -153,6 +154,7 @@ int run(char *wasmFile, char *wasmFunction, int argc, char **argv, int preopenLe
   /* Create the configure context and add the WASI support. */
   /* This step is not necessary unless you need WASI support. */
   WasmEdge_ConfigureContext *ConfCxt = WasmEdge_ConfigureCreate();
+  WasmEdge_ConfigureAddProposal(ConfCxt, WasmEdge_Proposal_MultiValue);
   WasmEdge_ConfigureAddHostRegistration(ConfCxt, WasmEdge_HostRegistration_Wasi);
 
   /* The configure and store context to the VM creation can be NULL. */
