@@ -6,8 +6,6 @@
 
 using namespace std;
 
-
-/* This function can add 2 i32 values and return the result. */
 WasmEdge_Result Add(void *, const WasmEdge_CallingFrameContext *,
                     const WasmEdge_Value *In, WasmEdge_Value *Out) {
   /*
@@ -25,37 +23,74 @@ WasmEdge_Result Add(void *, const WasmEdge_CallingFrameContext *,
   return WasmEdge_Result_Success;
 }
 
+WasmEdge_Result StringLength(void *, const WasmEdge_CallingFrameContext *CallFrameCxt,
+                    const WasmEdge_Value *In, WasmEdge_Value *Out) {
+  /*
+  * Params: {i32, i32}
+  * Returns: {i32}
+  */
+
+  uint32_t Pointer = WasmEdge_ValueGetI32(In[0]);
+  uint32_t Size = WasmEdge_ValueGetI32(In[1]);
+
+  unsigned char Url[Size];
+
+  // printf("Pointer: %u\n", Pointer);
+  // printf("Size: %u\n", Size);
+
+  // https://wasmedge.org/docs/embed/c/host_function/#calling-frame-context
+  // https://www.secondstate.io/articles/extend-webassembly/
+  WasmEdge_MemoryInstanceContext *MemCxt = WasmEdge_CallingFrameGetMemoryInstance(CallFrameCxt, 0);
+  // read data
+  WasmEdge_Result Res = WasmEdge_MemoryInstanceGetData(MemCxt, Url, Pointer, Size);
+  if (WasmEdge_ResultOK(Res)) {
+    // printf("u32 at memory[%u]: %s\n", Pointer, Url);
+
+    Out[0] = WasmEdge_ValueGenI32(Size);
+
+    return WasmEdge_Result_Success;
+  } else {
+    return Res;
+  }
+}
+
 WasmEdge_ModuleInstanceContext *CreateExternModule() {
-  // 1. Create a function type and function context
+  // 1. Module Instance Creation
+  WasmEdge_String HostModuleName = WasmEdge_StringCreateByCString("native_functions");
+  WasmEdge_ModuleInstanceContext *HostModCxt = WasmEdge_ModuleInstanceCreate(HostModuleName);
+
+
+  // 2. Create a function type and function context - "add"
   enum WasmEdge_ValType ParamList[2] = {WasmEdge_ValType_I32,
                                         WasmEdge_ValType_I32};
   enum WasmEdge_ValType ReturnList[1] = {WasmEdge_ValType_I32};
   /* Create a function type: {i32, i32} -> {i32}. */
-  WasmEdge_FunctionTypeContext *HostFType =
-      WasmEdge_FunctionTypeCreate(ParamList, 2, ReturnList, 1);
-  /*
-    * Create a function context with the function type and host function body.
-    * The `Cost` parameter can be 0 if developers do not need the cost
-    * measuring.
-    */
-  WasmEdge_FunctionInstanceContext *HostFunc = WasmEdge_FunctionInstanceCreate(HostFType, Add, NULL, 0);
-  /*
-    * The third parameter is the pointer to the additional data.
-    * Developers should guarantee the life cycle of the data, and it can be NULL if the external data is not needed.
-    */
-
-  // 2. Module Instance Creation
-  WasmEdge_String HostModuleName = WasmEdge_StringCreateByCString("native_functions");
-  WasmEdge_ModuleInstanceContext *HostModCxt = WasmEdge_ModuleInstanceCreate(HostModuleName);
-
-  /* 3. Add the host function created above with the export name "add". */
+  WasmEdge_FunctionTypeContext *HostFTypeAdd = WasmEdge_FunctionTypeCreate(ParamList, 2, ReturnList, 1);
+  WasmEdge_FunctionInstanceContext *HostFuncCtxAdd = WasmEdge_FunctionInstanceCreate(HostFTypeAdd, Add, NULL, 0);
+  //
+  // Add the host function created above with the export name "add"
   WasmEdge_String HostFuncName = WasmEdge_StringCreateByCString("add");
-  WasmEdge_ModuleInstanceAddFunction(HostModCxt, HostFuncName, HostFunc);
+  WasmEdge_ModuleInstanceAddFunction(HostModCxt, HostFuncName, HostFuncCtxAdd);
+  WasmEdge_StringDelete(HostFuncName);
+  WasmEdge_FunctionTypeDelete(HostFTypeAdd);
+
+
+  // 3. Create a function type and function context - "string_length"
+  enum WasmEdge_ValType ParamListStringLength[2] = {WasmEdge_ValType_I32,
+                                        WasmEdge_ValType_I32};
+  enum WasmEdge_ValType ReturnListStringLength[1] = {WasmEdge_ValType_I32};
+  /* Create a function type: {i32, i32} -> {i32}. */
+  WasmEdge_FunctionTypeContext *HostFTypeStringLength = WasmEdge_FunctionTypeCreate(ParamListStringLength, 2, ReturnListStringLength, 1);
+  WasmEdge_FunctionInstanceContext *HostFuncCtxStringLength = WasmEdge_FunctionInstanceCreate(HostFTypeStringLength, StringLength, NULL, 0);
+
+  HostFuncName = WasmEdge_StringCreateByCString("string_length");
+  WasmEdge_ModuleInstanceAddFunction(HostModCxt, HostFuncName, HostFuncCtxStringLength);
+  WasmEdge_StringDelete(HostFuncName);
+  WasmEdge_FunctionTypeDelete(HostFTypeStringLength);
+
 
   // 4. cleanup
-  WasmEdge_StringDelete(HostFuncName);
   WasmEdge_StringDelete(HostModuleName);
-  WasmEdge_FunctionTypeDelete(HostFType);
 
   return HostModCxt;
 }
@@ -79,26 +114,7 @@ int run(char *wasmFile, char *wasmFunction, int argc, char **argv, int preopenLe
 
   WasmEdge_Result Res;
 
-
-  // connect host module
-  //
-  WasmEdge_String ModuleName = WasmEdge_StringCreateByCString("host_module");
-
-  // // host functions written in rust
-  Res = WasmEdge_VMRegisterModuleFromFile(VMCxt, ModuleName, "host_module/target/wasm32-wasi/release/host_module.wasm");
-
-  if (!WasmEdge_ResultOK(Res)) {
-    WasmEdge_VMDelete(VMCxt);
-    printf("Register host functions error: %s\n", WasmEdge_ResultGetMessage(Res));
-    return -1;
-  }
-
-  WasmEdge_StringDelete(ModuleName);
-  //
-  //
-
-
-  // Add internal host function
+  // Add host module
   //
 
   WasmEdge_ModuleInstanceContext *HostModCxt = CreateExternModule();
