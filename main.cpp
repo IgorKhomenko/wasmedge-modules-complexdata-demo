@@ -54,6 +54,43 @@ WasmEdge_Result StringLength(void *, const WasmEdge_CallingFrameContext *CallFra
   }
 }
 
+WasmEdge_Result StringOddOrEven(void *, const WasmEdge_CallingFrameContext *CallFrameCxt,
+                    const WasmEdge_Value *In, WasmEdge_Value *Out) {
+  /*
+  * Params: {i32, i32, i32}
+  * Returns: {i32}
+  */
+
+  uint32_t SourcePointer = WasmEdge_ValueGetI32(In[0]);
+  uint32_t SourceSize = WasmEdge_ValueGetI32(In[1]);
+  uint32_t TargetPointer = WasmEdge_ValueGetI32(In[2]);
+
+  unsigned char Url[SourceSize];
+
+  // printf("Pointer: %u\n", SourcePointer);
+  // printf("Size: %u\n", SourceSize);
+
+  // https://wasmedge.org/docs/embed/c/host_function/#calling-frame-context
+  // https://www.secondstate.io/articles/extend-webassembly/
+  WasmEdge_MemoryInstanceContext *MemCxt = WasmEdge_CallingFrameGetMemoryInstance(CallFrameCxt, 0);
+  // read data
+  WasmEdge_Result Res = WasmEdge_MemoryInstanceGetData(MemCxt, Url, SourcePointer, SourceSize);
+  if (WasmEdge_ResultOK(Res)) {
+    printf("u32 at memory[%u]: %s\n", SourcePointer, Url);
+
+    unsigned char odd[] = "odd";
+    unsigned char even[] = "even";
+
+    WasmEdge_MemoryInstanceSetData(MemCxt, odd, TargetPointer, 3);
+
+    Out[0] = WasmEdge_ValueGenI32(SourceSize);
+
+    return WasmEdge_Result_Success;
+  } else {
+    return Res;
+  }
+}
+
 WasmEdge_ModuleInstanceContext *CreateExternModule() {
   // 1. Module Instance Creation
   WasmEdge_String HostModuleName = WasmEdge_StringCreateByCString("native_functions");
@@ -61,8 +98,7 @@ WasmEdge_ModuleInstanceContext *CreateExternModule() {
 
 
   // 2. Create a function type and function context - "add"
-  enum WasmEdge_ValType ParamList[2] = {WasmEdge_ValType_I32,
-                                        WasmEdge_ValType_I32};
+  enum WasmEdge_ValType ParamList[2] = {WasmEdge_ValType_I32, WasmEdge_ValType_I32};
   enum WasmEdge_ValType ReturnList[1] = {WasmEdge_ValType_I32};
   /* Create a function type: {i32, i32} -> {i32}. */
   WasmEdge_FunctionTypeContext *HostFTypeAdd = WasmEdge_FunctionTypeCreate(ParamList, 2, ReturnList, 1);
@@ -89,7 +125,20 @@ WasmEdge_ModuleInstanceContext *CreateExternModule() {
   WasmEdge_FunctionTypeDelete(HostFTypeStringLength);
 
 
-  // 4. cleanup
+  // 4. Create a function type and function context - "string_odd_or_even"
+  enum WasmEdge_ValType ParamListStringOddOrEven[3] = {WasmEdge_ValType_I32,WasmEdge_ValType_I32, WasmEdge_ValType_I32};
+  enum WasmEdge_ValType ReturnListStringOddOrEven[1] = {WasmEdge_ValType_I32};
+  /* Create a function type: {i32, i32, i32} -> {i32}. */
+  WasmEdge_FunctionTypeContext *HostFTypeStringOddOrEven = WasmEdge_FunctionTypeCreate(ParamListStringOddOrEven, 3, ReturnListStringOddOrEven, 1);
+  WasmEdge_FunctionInstanceContext *HostFuncCtxStringOddOrEven = WasmEdge_FunctionInstanceCreate(HostFTypeStringOddOrEven, StringOddOrEven, NULL, 0);
+
+  HostFuncName = WasmEdge_StringCreateByCString("string_odd_or_even");
+  WasmEdge_ModuleInstanceAddFunction(HostModCxt, HostFuncName, HostFuncCtxStringOddOrEven);
+  WasmEdge_StringDelete(HostFuncName);
+  WasmEdge_FunctionTypeDelete(HostFTypeStringOddOrEven);
+
+
+  // 5. cleanup
   WasmEdge_StringDelete(HostModuleName);
 
   return HostModCxt;
