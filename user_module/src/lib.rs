@@ -1,22 +1,32 @@
 #[no_mangle]
 pub fn hello() {
   unsafe {
-      let input = "https://www.google.com";
-	    let pointer = input.as_bytes().as_ptr();
-      let res_len = native_functions::string_length(pointer, input.len() as i32) as usize;
-      println!("string_length {:#?}: {:#?}", input, res_len);
+      // //
+      // //
+      // let input = "https://www.google.com";
+	    // let pointer = input.as_bytes().as_ptr();
+      // let length = native_functions::string_length(pointer, input.len() as i32) as usize;
+      // println!("string_length {:#?}: {:#?}", input, length);
 
-      let val1 = 4;
-      let val2 = 5;
-      println!("add {:#?}+{:#?}: {:#?}", val1, val2, native_functions::add(val1, val2));
+      // //
+      // //
+      // let val1 = 4;
+      // let val2 = 5;
+      // println!("add {:#?}+{:#?}: {:#?}", val1, val2, native_functions::add(val1, val2));
 
+      //
+      //
       let input2 = "https://www.google.com";
 	    let source_pointer = input2.as_bytes().as_ptr();
 
-      let res = "123";
-      let target_pointer = res.as_bytes().as_ptr();
+      let mut buffer = Vec::with_capacity(0);
+	    let target_pointer = buffer.as_mut_ptr();
 
-      native_functions::string_odd_or_even(source_pointer, input2.len() as i32, target_pointer) as usize;
+      let result_len = native_functions::string_odd_or_even(source_pointer, input2.len() as i32, target_pointer) as usize;
+
+      buffer.set_len(result_len);
+	    let res = std::str::from_utf8(&buffer).unwrap();
+
       println!("string_odd_or_even {:#?}: {:#?}", input2, res);
   }
 }

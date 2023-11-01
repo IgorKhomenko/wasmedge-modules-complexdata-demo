@@ -76,14 +76,19 @@ WasmEdge_Result StringOddOrEven(void *, const WasmEdge_CallingFrameContext *Call
   // read data
   WasmEdge_Result Res = WasmEdge_MemoryInstanceGetData(MemCxt, Url, SourcePointer, SourceSize);
   if (WasmEdge_ResultOK(Res)) {
-    printf("u32 at memory[%u]: %s\n", SourcePointer, Url);
+    // printf("u32 at memory[%u]: %s\n", SourcePointer, Url);
 
-    unsigned char odd[] = "odd";
-    unsigned char even[] = "even";
-
-    WasmEdge_MemoryInstanceSetData(MemCxt, odd, TargetPointer, 3);
-
-    Out[0] = WasmEdge_ValueGenI32(SourceSize);
+    if (SourceSize % 2 == 0) {
+      const char even[] = "even";
+      const size_t len = strlen(even);
+      WasmEdge_MemoryInstanceSetData(MemCxt, (unsigned char *)even, TargetPointer, len);
+      Out[0] = WasmEdge_ValueGenI32(len);
+    } else {
+      const char odd[] = "odd";
+       const size_t len = strlen(odd);
+      WasmEdge_MemoryInstanceSetData(MemCxt, (unsigned char *)odd, TargetPointer, len);
+      Out[0] = WasmEdge_ValueGenI32(len);
+    }
 
     return WasmEdge_Result_Success;
   } else {
