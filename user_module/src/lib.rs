@@ -31,7 +31,7 @@ pub mod native_functions {
       let mut buffer = Vec::with_capacity(0);
       let target_pointer = buffer.as_mut_ptr();
   
-      let result_len = self::native_functions::string_odd_or_even(source_pointer, input.len() as i32, target_pointer) as usize;
+      let result_len = native_functions::string_odd_or_even(source_pointer, input.len() as i32, target_pointer) as usize;
   
       buffer.set_len(result_len);
       let res = String::from_utf8(buffer).unwrap();
