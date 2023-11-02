@@ -18,3 +18,7 @@ Cargo.lock
 *.wasm
 
 /target
+
+.DS_Store
+
+.vscode
